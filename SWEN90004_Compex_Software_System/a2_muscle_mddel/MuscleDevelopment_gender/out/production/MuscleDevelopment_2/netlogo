@@ -1,0 +1,134 @@
+breed [ muscle-fibers muscle-fiber ]
+
+muscle-fibers-own [
+  fiber-size   ;; 纤维的当前大小，独立于NetLogo的内置“size”变量
+  max-size     ;; 纤维的最大潜在大小
+]
+
+patches-own [
+  anabolic-hormone  ;; 合成代谢荷尔蒙，促进肌肉建设
+  catabolic-hormone ;; 分解代谢荷尔蒙，促进肌肉分解
+]
+
+globals [
+  muscle-mass  ;; 全局变量，储存所有肌肉纤维大小的总和
+  anabolic-hormone-max  ;; 合成代谢荷尔蒙的最大值
+  anabolic-hormone-min  ;; 合成代谢荷尔蒙的最小值
+  catabolic-hormone-max ;; 分解代谢荷尔蒙的最大值
+  catabolic-hormone-min ;; 分解代谢荷尔蒙的最小值
+  hormone-diffuse-rate  ;; 荷尔蒙在肌肉纤维间扩散的速率
+]
+
+to setup
+  clear-all                    ;; 清除所有对象和变量，初始化环境
+  set-default-shape muscle-fibers "circle"  ;; 设置muscle-fibers的默认形状为圆形
+  initialize-hormones          ;; 初始化荷尔蒙水平
+  new-muscle-fibers            ;; 创建新的肌肉纤维
+  set muscle-mass sum [fiber-size] of muscle-fibers  ;; 计算并设置肌肉总质量
+  reset-ticks                  ;; 重置模型的计时器
+end
+
+to initialize-hormones
+  set hormone-diffuse-rate 0.75  ;; 设置荷尔蒙扩散率为0.75
+  ask patches [
+    set anabolic-hormone-max 200
+    set catabolic-hormone-max 250
+    set anabolic-hormone-min 50
+    set catabolic-hormone-min 52
+    set anabolic-hormone 50   ;; 初始化各补丁的合成代谢荷尔蒙水平
+    set catabolic-hormone 52  ;; 初始化各补丁的分解代谢荷尔蒙水平
+  ]
+  regulate-hormones  ;; 调节荷尔蒙水平，确保它们在合理范围内
+end
+
+to new-muscle-fibers
+  ask patches [
+    sprout-muscle-fibers 1 [  ;; 在每个补丁上生成一个muscle-fiber
+      set max-size 4  ;; 设置纤维的最大潜在大小为4
+      repeat 20 [  ;; 重复20次，模拟随机变化以达到不同的最大大小
+        if random-float 100 > %-slow-twitch-fibers [
+          set max-size max-size + 1
+        ]
+      ]
+      set fiber-size (0.2 + random-float 0.4) * max-size  ;; 设置纤维的初始大小
+      regulate-muscle-fibers  ;; 调节肌肉纤维，确保大小在合理范围内
+    ]
+  ]
+end
+
+to go
+  perform-daily-activity  ;; 模拟日常活动对荷尔蒙的影响
+  if lift? and (ticks mod days-between-workouts = 0) [
+    lift-weights  ;; 如果是举重日，则执行举重对荷尔蒙的影响
+  ]
+  sleep  ;; 模拟睡眠对荷尔蒙的影响
+  regulate-hormones  ;; 再次调节荷尔蒙水平
+  develop-muscle  ;; 发展肌肉纤维
+  set muscle-mass sum [fiber-size] of muscle-fibers  ;; 更新肌肉总质量
+  tick  ;; 推进模型时间
+end
+
+to perform-daily-activity
+  ;; 模拟日常活动（如看电视和工作）对荷尔蒙水平的影响
+  ask muscle-fibers [
+    set catabolic-hormone catabolic - 2.0 * (log fiber-size + 10)  ;; 增加肌肉纤维中的分解代谢荷尔蒙
+    set anabolic-hormone anabolic-hormone + 2.5 * (log fiber-size 10)    ;; 增加肌肉纤维中的合成代谢荷尔蒙
+  ]
+end
+
+to lift-weights
+  ;; 模拟举重活动对荷尔蒙水平的影响
+  ask muscle-fibers [
+    if (random-float 1.0 < intensity / 100 * intensity / 100) [  ;; 基于强度计算的概率，判断是否影响荷尔蒙
+      set anabolic-hormone anabolic-hormone + (log fiber-size 10) * 55  ;; 举重时增加合成代谢荷尔蒙
+      set catabolic-hormone catabolic-hormone + (log fiber-size 10) * 44  ;; 举重时增加分解代谢荷尔蒙
+    ]
+  ]
+end
+
+to sleep
+  ;; 模拟睡眠对荷尔蒙的影响
+  ask patches [
+    set catabolic-hormone catabolic-hormone - 0.5 * (log catabolic-hormone 10) * hours-of-sleep  ;; 睡眠期间减少分解代谢荷尔蒙
+    set anabolic-hormone anabolic-hormone - 0.48 * (log anabolic-hormone 10) * hours-of-sleep    ;; 睡眠期间减少合成代谢荷尔蒙
+  ]
+end
+
+to develop-muscle
+  ;; 发展肌肉纤维的过程
+  ask muscle-fibers [
+    grow  ;; 调用grow过程以生长肌肉纤维
+    regulate-muscle-fibers  ;; 调用regulate-muscle-fibers以调节肌肉纤维的大小和属性
+  ]
+end
+
+to grow
+  ;; 根据荷尔蒙水平调节肌肉纤维的大小
+  set fiber-size (fiber-size - 0.20 * (log catabolic-hormone 10))  ;; 依据分解代谢荷尔蒙减小纤维大小
+  set fiber-size (fiber-size + 0.20 * min (list (log anabolic-hormone 10)  ;; 依据合成代谢荷尔蒙增加纤维大小
+                                               (1.05 * log catabolic-hormone 10)))
+end
+
+to regulate-muscle-fibers
+  ;; 确保肌肉纤维的大小保持在生物学上合理的范围内
+  if (fiber-size < 1) [set fiber-size 1]  ;; 如果纤维大小小于1，则设置为1
+  if (fiber-size > max-size) [set fiber-size max-size]  ;; 如果纤维大小超过最大值，则设置为最大值
+  set color scale-color red fiber-size (-0.5 * max-size) (3 * max-size)  ;; 根据纤维大小设置颜色，红色渐变
+  set size max list 0.2 (min list 1 (fiber-size / 20))  ;; 设置显示大小，确保在视觉上容易观察
+end
+
+to regulate-hormones
+  ;; 调节荷尔蒙水平，以确保荷尔蒙在模拟中保持平衡
+  diffuse anabolic-hormone hormone-diffuse-rate  ;; 扩散合成代谢荷尔蒙
+  diffuse catabolic-hormone hormone-diffuse-rate  ;; 扩散分解代谢荷尔蒙
+  ask patches [
+    set anabolic-hormone min (list anabolic-hormone anabolic-hormone-max)  ;; 将合成代谢荷尔蒙设置在最小值和最大值之间
+    set anabolic-hormone max (list anabolic-hormone anabolic-hormone-min)  ;; 确保合成代谢荷尔蒙不低于最小值
+    set catabolic-hormone min (list catabolic-hormone catabolic-hormone-max)  ;; 将分解代谢荷尔蒙设置在最小值和最大值之间
+    set catabolic-hormone max (list catabolic-hormone catabolic-hormone-min)  ;; 确保分解代谢荷尔蒙不低于最小值
+    ;; 根据荷尔蒙浓度对补丁进行着色，显示合成代谢和分解代谢荷尔蒙的比例
+    set pcolor approximate-rgb ((catabolic-hormone / catabolic-hormone-max) * 255)
+                              ((anabolic-hormone / anabolic-hormone-max) * 255)
+                              0
+  ]
+end
