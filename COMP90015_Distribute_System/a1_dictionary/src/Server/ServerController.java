@@ -1,5 +1,6 @@
+package Server;
 
-
+import DAO.DictionaryDao;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.InputStreamReader;
