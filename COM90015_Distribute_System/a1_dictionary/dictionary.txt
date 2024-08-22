@@ -1,0 +1,3 @@
+qq:tencent2
+test:testing
+word:literal sigal
